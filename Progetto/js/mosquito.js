@@ -111,23 +111,30 @@ d3.json("dataset/dataset.json")
         console.log("disegno la mosca")
         // disegna la zanzara
         drawMosquito(data[idxDataCase]);
-        idxDataCase += 1;
 
         var mosquito = d3.select("#mosquito");
+        var background = d3.select("body")
         console.log("Ecco il mosquito trovato " + mosquito);
 
-        // @TODO: se clicca sul background la zanzara si sposta in maniera fluida sul datacase successivo
-
-        // @TODO: se l'utente clicca sull'svg allora ritorna al datacase precedente
+        // Se l'utente clicca sull'svg allora ritorna al datacase precedente
         mosquito.on('click', function() {
-            // @TODO: capisci come fare a aggiungere event listener sulla mosca per capire quando si sta cliccando su di essa
-            var coords = d3.mouse(this);
-            console.log("Ho cliccato qui " + coords);
+            idxDataCase -= 1;
+            console.log("Ho cliccato il mosquito: next datacase è " + idxDataCase % 10)
+            // se è diventato negativo, il datacase in cui mi voglio spostare è l'ultimo (decimo)
+            if(idxDataCase < 0){
+                idxDataCase = 9; // indice del decimo elemento (0-based array)
+                console.log("NEGATIVE! torno all'elemento " + idxDataCase % 10)
+            }
             updateMosquitoPosition(data, idxDataCase);
-            console.log("Ho disegnato il " + idxDataCase + " data case")
-            idxDataCase += 1;
         })
 
+        // Se utente clicca sul background la zanzara si sposta in maniera fluida sul datacase successivo
+        background.on("click", function() {
+            // @TODO trovare un modo per evitare che si verifichi questo evento quando in realtà sto cliccando sulla zanzara
+            idxDataCase += 1;
+            updateMosquitoPosition(data, idxDataCase);
+            console.log("Ho cliccato il background: " + idxDataCase % 10 + " data case")
+        })
     })
     .catch(function(error){
         // stampa che c'è stato un errore e abortisci

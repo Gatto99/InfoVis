@@ -14,13 +14,6 @@ var height = windowHeight - margin.top - margin.bottom;
 
 // TODO: prendi grandezza finestra e aggiornala a runtime
 
-// function widthResizer(){
-//     windowWidth = window.innerWidth;
-//     windowHeight = window.innerHeight;
-// }
-
-// window.addEventListener("resize", widthResizer)
-
 // definisci il range delle x
 var xScale =  d3.scaleLinear().range([0,width])
 
@@ -42,9 +35,7 @@ var svg = d3.select("body")
 
 // gruppo in cui ci sono gli assi cartesiani
 var cartesian = svg.append("g")
-                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")"); // sposto quello che sta dentro l'svg (nel g) del margine dato
-
-console.log("loading json");
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")"); // sposto quello che sta dentro l'svg (nel g) del margine dato
 
 // disegna gli assi
 function drawAxis(){
@@ -73,7 +64,7 @@ function drawMosquito(firstDataCase){
 
     // la zanzara viene disegnata dentro un svg != da quello usato per contenere gli assi, di modo che essa non venga clippata.
     // (i.e. se la zanzara fosse dentro l'svg contenente il piano e fosse posizionata sul contorno, 
-    //       poiché il path associato ha l'origine nel centro, la zanzara verrebbe clippata poiché uscirebbe dall'svg)
+    //       poiché il path associato alla zanzara ha l'origine nel centro, la zanzara verrebbe clippata poiché uscirebbe dall'svg)
     // N.B. poiché il group contenente gli assi (ma non la zanzara!) è traslato, dovremmo tener conto della traslazione anche per la zanzara
     
     // crea un gruppo in cui mettere il rettangolo e la zanzara
@@ -98,25 +89,38 @@ function drawMosquito(firstDataCase){
 
 // funzione che disegna un punto sul piano per ogni datacases
 function drawDatacases(data){
-    // crea un gruppo dentro l'svg del grafico
-    d3.select("body").select("svg").select("g").append("g").selectAll("rect").data(data).enter().append("circle")
-    .attr("cx",function(d){return xScale(d["x"])}).attr("cy",function(d){return yScale(d["y"])}).attr("r","2").attr("fill","red")
-
-    // TODO: scegli un colore non puro nel fill
+    // Nell'svg, dentro il gruppo relativo al grafico (in cui ci sono gli assi), 
+    // aggiungo un gruppo che conterrà tutti i punti (cerchi) relativi ai datacases
+    cartesian.append("g")
+    .selectAll("circle")
+    .data(data)
+    .enter().append("circle")
+    .attr("cx",function(d){return xScale(d["x"])}) // i cerchi sono posizionati in corrispondenza dei datacases
+    .attr("cy",function(d){return yScale(d["y"])}) // quindi accedo alle loro coordinate con xScale
+    .attr("r","5")
+    .attr("fill","#d44242")
 }
 
-// aggiorna la posizione delle zanzara in base al datacase
-// @TODO: passare direttamente il nuovo datacase?
-function updateMosquitoPosition(data, idxNextDataCase){
+// funzione che crea un tooltip per visualizzare le coordinate del datacase in cui si è posizionata la zanzara
+function drawTooltip(){
+    d3.select("div")
+    .append("div")
+    .style("opacity", 0)
+    .attr("class", "tooltip")
+    .style("background-color", "white")
+    .style("border", "solid")
+    .style("border-width", "2px")
+    .style("border-radius", "5px")
+    .style("padding", "5px")
+    .style("position","absolute") // da mettere se la si vuole posizionare manualmente
+}
 
-    let numDataCase = data.length; // numero di datacases nel dataset
-    
-    // indice del prossimo data case riportato nel dominio [0,numDataCase]
-    idxNextDataCase = idxNextDataCase % numDataCase
+// aggiorna la posizione delle zanzara al datacase passato come parametro
+function updateMosquitoPosition(nxtDatacase){
 
     // x e y del datacase
-    x = data[idxNextDataCase]["x"]
-    y = data[idxNextDataCase]["y"]
+    x = nxtDatacase["x"]
+    y = nxtDatacase["y"]
 
     // x e y del mosquito
     xMosquito = xScale(x)+margin.left
@@ -136,19 +140,14 @@ function updateXScaleDomain(data){
 function updateYScaleDomain(data){
     yScale.domain([0, d3.max(data, d => d["y"])])
 };
-
-/* NB: 
-    per accedere ai data case basta scrivere data[i]
-    per accedere al primo campo del nono datacase scrivere: datacase[8]["y"]
-*/
         
 // caricamento del dataset
 d3.json("dataset/dataset.json")
     .then(function(data){
         
         var idxDataCase = 0;
-        var dataLength = data.length; // numero datacases
-        console.log("Lunghezza dataset:" + dataLength);
+        var numDatacases = data.length;
+        console.log("Lunghezza dataset:" + numDatacases);
 
         // update della dominio di x e y
         updateXScaleDomain(data);
@@ -157,82 +156,90 @@ d3.json("dataset/dataset.json")
         // disegno assi
         drawAxis();
 
-        console.log("disegno la mosca");
-        // disegna la zanzara
-        drawMosquito(data[idxDataCase]);
+        console.log("Disegno la mosca");
+        // disegna la zanzara sul primo datacase
+        drawMosquito(data[0]);
 
         // disegna datacase
         drawDatacases(data);
 
+        // disegna tooltip
+        drawTooltip();
+
         var mosquitoRect = d3.select("#mosquitoRect"); // hitbox zanzara
         var mosquito = d3.select("#mosquito");         // path zanzara
         var background = d3.select("body")             // body del DOM
+        var Tooltip = d3.select(".tooltip")            // tooltip
         console.log("Ecco il mosquito trovato " + mosquito);
-
-        // Tooltip per visualizzare le coordinate del datacase corrente (su cui è posizionata la zanzara)
-        var Tooltip = d3.select("div")
-        .append("div")
-        .style("opacity", 0)
-        .attr("class", "tooltip")
-        .style("background-color", "white")
-        .style("border", "solid")
-        .style("border-width", "2px")
-        .style("border-radius", "5px")
-        .style("padding", "5px")
-        .style("position","absolute") // da mettere se la si vuole posizionare manualmente
 
         // ========================FUNCTION EVENTS========================
         // Three function that change the tooltip when user hover / move / leave a cell
         // MOUSEOVER
         var mouseover = function() {
             console.log("triggered mouseover")
-            Tooltip
-            .style("opacity", 1)
+            Tooltip.style("opacity", 1)
         }
 
         // MOUSEMOVE
-        var mousemove = function(event) {
+        var mousemove = function() {
             console.log("triggered mousemove")
 
-            // TODO: trovare un modo migliore per prendere il datacase associato alla mosca
             mosquito = d3.select(this)
             // Conversione per avere le coordinate nel piano associate alla posizione della mosca
             //      1. Prendere la posizione del rettangolo contenente l'elemento in questione
             //      2. Togli il margine aggiunto nella funzione drawMosquito (DA MODIFICARE)
             //      3. Inverti la scala per avere da un valore del range, un valore del dominio (.invert)
-            //      4. Converti all'inter più vicino
+            //      4. Converti all'intero più vicino
             xDatacase = Math.round(xScale.invert(mosquito.node().getBoundingClientRect().x - margin.left))
             yDatacase = Math.round(yScale.invert(mosquito.node().getBoundingClientRect().y - margin.top))
 
             xMosquito = xScale(xDatacase)
             yMosquito = yScale(yDatacase)
+
+            // spostamento del tooltip rispetto alla zanzara
+            let leftTooltipOffset = 25
+            let topTooltipOffset = 10
             
             Tooltip.html("x: " + xDatacase + "</br>y: " + yDatacase)
-            .style("left", xMosquito + margin.left + 25 + "px")
-            .style("top", yMosquito + margin.top + 10 + "px")
+            .style("left", xMosquito + margin.left + leftTooltipOffset + "px")
+            .style("top", yMosquito + margin.top + topTooltipOffset + "px")
         }
 
         // MOUSELEAVE
         var mouseleave = function() {
             console.log("triggered mouseleave")
-            Tooltip
-            .style("opacity", 0)
+            Tooltip.style("opacity", 0)
+        }
+
+        // !BUG: quando mi posiziono col cursore sul prossimo datacase e clicco sul background, 
+        //       non appare il tooltip nonostante ora sono sopra la zanzara col cursore
+
+        // PREVDATACASE
+        // funzione che quando viene triggerata muove la zanzara sul datacase precedente
+        var goPrevDatacase = function(event) {
+            idxDataCase -= 1;
+            console.log("Ho cliccato il mosquito: next datacase è " + idxDataCase)
+            // se è diventato negativo, il datacase in cui mi voglio spostare è l'ultimo (decimo)
+            if(idxDataCase < 0){
+                idxDataCase = numDatacases - 1; // indice del decimo elemento (0-based array)
+                console.log("NEGATIVE! torno all'elemento " + idxDataCase)
+            }
+            
+            updateMosquitoPosition(data[idxDataCase]);
+            dispatchEvents.call("mouseleave");
+            event.stopPropagation(); // evita che l'evento si propaghi e triggeri l'event listener sul body
         }
 
         // NEXTDATACASE
-        // funzione che quando viene triggerata muove la zanzara sul datacase precedente
-        var goNextDatacase = function(event) {
-            idxDataCase -= 1;
-            console.log("Ho cliccato il mosquito: next datacase è " + idxDataCase % dataLength)
-            // se è diventato negativo, il datacase in cui mi voglio spostare è l'ultimo (decimo)
-            if(idxDataCase < 0){
-                idxDataCase = dataLength - 1; // indice del decimo elemento (0-based array)
-                console.log("NEGATIVE! torno all'elemento " + idxDataCase % dataLength)
-            }
-            updateMosquitoPosition(data, idxDataCase);
-            dispatchEvents.call("mouseleave");
-            // !BUG: quando mi posiziono sul prossimo datacase e clicco sul background, non appare il tooltip nonostante ora sono sopra la zanzara col cursore
-            event.stopPropagation(); // evita che l'evento si propaghi e triggeri l'event listener sul body
+        // funzione che quando viene triggerata muove la zanzara sul datacase successivo
+        var goNextDatacase = function() {
+            idxDataCase += 1;
+            console.log("Ho cliccato il background: next datacase è " + idxDataCase % numDatacases)
+    
+            // indice del prossimo data case riportato nel dominio [0,numDatacases]
+            idxDataCase = idxDataCase % numDatacases
+            
+            updateMosquitoPosition(data[idxDataCase]);
         }
 
         // creo un dispatch che genera eventi e ne associa una funzione così da poterli richiamare ovunque
@@ -241,27 +248,27 @@ d3.json("dataset/dataset.json")
         dispatchEvents.on("mouseleave", mouseleave)
         dispatchEvents.on("mousemove", mousemove)
 
+        // ===============================================================
+
         // TODO: trovare un modo per non mettere gli eventListeners sia sulla hitbox che sul path
 
+        // ========================EVENT LISTENERS========================
         // Se l'utente clicca sul path allora ritorna al datacase precedente
         // eventListener per il path
-        mosquito.on('click', function(event) {goNextDatacase(event)})
+        mosquito.on('click', function(event) {goPrevDatacase(event)})
         .on("mouseover", function(){dispatchEvents.call("mouseover",this)})
         .on("mousemove", function(event){dispatchEvents.call("mousemove",this,event)})
         .on("mouseleave", function(){dispatchEvents.call("mouseleave",this)})
 
         // eventListener per la hitbox
-        mosquitoRect.on('click', function(event) {goNextDatacase(event)})
+        mosquitoRect.on('click', function(event) {goPrevDatacase(event)})
         .on("mouseover", function(){dispatchEvents.call("mouseover",this)})
         .on("mousemove", function(event){dispatchEvents.call("mousemove",this,event)})
         .on("mouseleave", function(){dispatchEvents.call("mouseleave",this)})
 
         // Se utente clicca sul background la zanzara si sposta in maniera fluida sul datacase successivo
-        background.on("click", function() {
-            idxDataCase += 1;
-            updateMosquitoPosition(data, idxDataCase);
-            console.log("Ho cliccato il background: " + idxDataCase % dataLength + " data case")
-        })
+        background.on("click", function() {goNextDatacase()})
+        // ===============================================================
     })
     .catch(function(error){
         // stampa che c'è stato un errore e abortisci
